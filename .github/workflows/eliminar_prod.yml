@@ -1,0 +1,73 @@
+name: Elimiar reportes PROD (Mantener 2 versiones más nuevas)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup-prod:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Keep only 2 highest versions
+        run: |
+          paths=(
+            "ciudad/desktop/prod"
+            "ciudad/webmobile/prod"
+            "eldoce/desktop/prod"
+            "eldoce/webmobile/prod"
+            "eltrece/desktop/prod"
+            "eltrece/webmobile/prod"
+            "tnpt1/desktop/prod"
+            "tnpt1/webmobile/prod"
+            "tnpt2/desktop/prod"
+            "tnpt2/webmobile/prod"
+            "tnpt3/desktop/prod"
+            "tnpt3/webmobile/prod"
+          )
+
+          for path in "${paths[@]}"; do
+            if [ -d "$path" ]; then
+              echo "------------------------------------------"
+              echo "Analizando versiones en: $path"
+              
+              cd "$path"
+              
+              # 1. ls -d */ : Lista los directorios (ej: 649/ 650/ 651/)
+              # 2. sed 's/\///g' : Quita la barra inclinada final para dejar solo el número
+              # 3. sort -rn : Ordena numéricamente de mayor a menor
+              # 4. tail -n +3 : Selecciona a partir del tercero (excluye los 2 más altos)
+              
+              versions_to_delete=$(ls -d */ 2>/dev/null | sed 's/\///g' | sort -rn | tail -n +3)
+              
+              if [ -n "$versions_to_delete" ]; then
+                for version in $versions_to_delete; do
+                  echo "Borrando versión antigua: $version"
+                  rm -rf "$version"
+                done
+              else
+                echo "No hay versiones suficientes para borrar (2 o menos)."
+              fi
+              
+              cd "$GITHUB_WORKSPACE"
+            else
+              echo "La ruta $path no existe, omitiendo..."
+            fi
+          done
+
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No hay cambios para subir."
+          else
+            git commit -m "Automated cleanup: Kept 2 highest versions in prod"
+            git push origin gh-pages
+          fi
