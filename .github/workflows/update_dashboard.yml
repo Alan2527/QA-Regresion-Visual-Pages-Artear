@@ -1,0 +1,54 @@
+name: Update QA Dashboard
+
+on:
+  workflow_dispatch:
+  # push:            <-- Se comentaron estas líneas
+  #   branches:
+  #     - gh-pages
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Bajamos la rama gh-pages directamente en la raíz (esto inicializa Git correctamente)
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      # 2. Bajamos SOLO el script desde main a una carpeta temporal
+      - name: Get script from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: temp-main
+
+      # 3. Movemos el script a la raíz y borramos la carpeta temporal
+      - name: Prepare script
+        run: |
+          cp temp-main/generate_index.py .
+          rm -rf temp-main
+
+      # 4. Configuramos Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install pytz
+
+      # 5. Ejecutamos el generador (ahora está en la raíz con los reportes)
+      - name: Run Index Generator
+        run: python generate_index.py
+
+      # 6. Desplegamos (ahora sí encontrará el directorio Git)
+      - name: Deploy Updated Index
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.REPORTS_TOKEN }}
+          folder: .        # La raíz actual
+          branch: gh-pages
+          clean: false
+          git-config-name: "Alan-Artear"
+          git-config-email: "Alan-Artear@users.noreply.github.com"
